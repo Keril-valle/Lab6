@@ -1,12 +1,13 @@
 {
   "dependencies": {
     "express": "*",
+    "jose": "^6.2.13",
     "mocha": "^10.2.0",
     "socket.io": "*"
   },
   "scripts": {
     "start": "node server.js",
-    "test": "mocha test/test.js",
+    "test": "mocha test",
     "test:integration": "jest --runInBand",
     "test:e2e": "playwright test",
     "test:all": "npm test && npm run test:integration && npm run test:e2e"

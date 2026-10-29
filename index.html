@@ -1,7 +1,9 @@
 <!doctype html>
-<html>
+<html lang="es">
   <head>
-    <title>Chat Socket.IO UNA</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UNA Chat</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body { font: 13px Helvetica, Arial; }
@@ -15,19 +17,67 @@
       #nombre, #m { display: inline-block;}
       #m {width: 69%; margin-right: 4px;}
       #nombre {width: 20%}
+
+      /* vistas de autenticacion */
+      #view-loading, #view-error, #view-unauthenticated { padding: 32px 24px; font-size: 14px; }
+      #view-loading { color: #444; }
+      #view-error { background: #fdecea; color: #611a15; border-bottom: 1px solid #f5c6cb; }
+      #view-error p { margin-bottom: 12px; }
+      #view-unauthenticated h1 { font-size: 22px; margin-bottom: 8px; }
+      #view-unauthenticated p { margin-bottom: 16px; color: #444; }
+      button { cursor: pointer; font: inherit; }
+      #btn-login, #btn-retry {
+        background: #111; color: #fff; border: 0; padding: 10px 18px; border-radius: 4px;
+      }
+      #chat-header {
+        position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 12px; padding: 8px 12px; background: #111; color: #fff;
+      }
+      #chat-header button {
+        background: transparent; color: #fff; border: 1px solid #666;
+        padding: 4px 10px; border-radius: 4px;
+      }
+      #view-chat #messages { padding-top: 44px; }
+      #user-name { font-weight: bold; }
+      [hidden] { display: none !important; }
     </style>
   </head>
   <body>
-    <ul id="messages"></ul>
-    <form action="">
-      <input id="nombre" autocomplete="off" placeholder="Username"/>
-      <input id="m" autocomplete="off" placeholder="Escriba un mensaje" /><button>Send</button>
-    </form>
+    <div id="view-loading">Cargando UNA Chat...</div>
+
+    <div id="view-error" hidden>
+      <p id="error-text"></p>
+      <button id="btn-retry" type="button">Reintentar</button>
+    </div>
+
+    <div id="view-unauthenticated" hidden>
+      <h1>UNA Chat</h1>
+      <p>Para entrar al chat, inicia sesion con tu cuenta de GitHub.</p>
+      <button id="btn-login" type="button">Iniciar sesion</button>
+    </div>
+
+    <div id="view-chat" hidden>
+      <header id="chat-header">
+        <span>Conectado como <strong id="user-name"></strong></span>
+        <button id="btn-logout" type="button">Cerrar sesion</button>
+      </header>
+      <ul id="messages"></ul>
+      <form action="">
+        <input id="nombre" autocomplete="off" placeholder="Username"/>
+        <input id="m" autocomplete="off" placeholder="Escriba un mensaje" /><button>Send</button>
+      </form>
+    </div>
+
     <script src="https://cdn.socket.io/4.7.2/socket.io.js"></script>
     <script src="https://code.jquery.com/jquery-1.11.1.js"></script>
     <script>
 
+    var AUTH0_SDK_URL = 'https://cdn.auth0.com/js/auth0-spa-js/2.18/auth0-spa-js.production.js';
+
     var colorHexTxt = "";
+    var socket = null;
+    var auth0Client = null;
 
     // genera colores aleatorios en hexadeximal
     function getRandomColor() {
@@ -40,44 +90,207 @@
         return color;
      }
 
-      $(function () {
-        var socket = io();
-
-        // marca de conexion para pruebas de integracion/E2E
-        socket.on('connect', function () {
-          document.body.setAttribute('data-chat-connected', 'true');
-        });
-
-        // emite evento al servidor
-        
-        $('form').submit(function(){
-            var nombreTxt = $('#nombre').val() || "Anomimo";
-            var mensajeTxt = $('#m').val();
-
-            if (colorHexTxt == "") {
-                colorHexTxt = getRandomColor();
-            }
-
-            var jsonMsg = { nombre: nombreTxt, mensaje: mensajeTxt, color: colorHexTxt };
-            socket.emit('Evento-Mensaje-Server', JSON.stringify(jsonMsg));
-            $('#m').val('');
-            return false;
-        });
-
-        // ... (resto del código) ...
-
-        // IMPORTANTE: el servidor (libs/unalib.js) escapa el nombre y el texto
-        // y valida el color, por eso aqui solo se inserta lo que llega ya saneado.
-        socket.on('Evento-Mensaje-Server', function(msg){
-            var msgJson = JSON.parse(msg);
-            var color = msgJson.color || '#000000';
-            var nombre = msgJson.nombre || '';
-            var mensajeDisplay = "<b style='color:"+ color +"'>" + nombre + "</b>: " + msgJson.mensaje;
-            $('#messages').append($('<li>').html(mensajeDisplay));
-            window.scrollTo(0, document.body.scrollHeight);
-        });
-
+    function mostrarVista(nombre) {
+      ['loading', 'error', 'unauthenticated', 'chat'].forEach(function (vista) {
+        var elemento = document.getElementById('view-' + vista);
+        if (elemento) {
+          elemento.hidden = vista !== nombre;
+        }
       });
+    }
+
+    function mostrarError(mensaje) {
+      document.getElementById('error-text').textContent = mensaje;
+      mostrarVista('error');
+    }
+
+    function mensajeDeError(codigo, detalle) {
+      if (codigo === 'access_denied') {
+        return 'Cancelaste el inicio de sesion. Cuando quieras, intenta de nuevo.';
+      }
+      if (codigo === 'invalid_request' || codigo === 'unauthorized_client') {
+        return 'La configuracion de Auth0 no coincide con esta URL. Revisa las Callback y Logout URLs de la aplicacion.';
+      }
+      return 'No se pudo iniciar sesion' + (detalle ? ': ' + detalle : '.') + ' Intenta de nuevo.';
+    }
+
+    // carga el SDK de Auth0 solo cuando hace falta (asi las pruebas no dependen del CDN)
+    function cargarSdk() {
+      return new Promise(function (resolve, reject) {
+        if (window.auth0) {
+          return resolve(window.auth0);
+        }
+
+        var script = document.createElement('script');
+        script.src = AUTH0_SDK_URL;
+        script.onload = function () {
+          window.auth0 ? resolve(window.auth0) : reject(new Error('sdk_invalido'));
+        };
+        script.onerror = function () { reject(new Error('sdk_no_disponible')); };
+        document.head.appendChild(script);
+      });
+    }
+
+    function iniciarChat(usuario, token) {
+      document.getElementById('user-name').textContent =
+        usuario ? (usuario.name || usuario.email || 'usuario') : 'modo pruebas';
+
+      mostrarVista('chat');
+
+      socket = io({ auth: { token: token || '' } });
+
+      // marca de conexion para pruebas de integracion/E2E
+      socket.on('connect', function () {
+        document.body.setAttribute('data-chat-connected', 'true');
+      });
+
+      // el servidor rechaza la conexion cuando el token no es valido
+      socket.on('connect_error', function () {
+        document.body.removeAttribute('data-chat-connected');
+        mostrarError('Tu sesion no es valida o expiro. Inicia sesion de nuevo para seguir chateando.');
+      });
+
+      // emite evento al servidor
+      $('form').submit(function(){
+          var nombreTxt = $('#nombre').val() || "Anomimo";
+          var mensajeTxt = $('#m').val();
+
+          if (colorHexTxt == "") {
+              colorHexTxt = getRandomColor();
+          }
+
+          var jsonMsg = { nombre: nombreTxt, mensaje: mensajeTxt, color: colorHexTxt };
+          socket.emit('Evento-Mensaje-Server', JSON.stringify(jsonMsg));
+          $('#m').val('');
+          return false;
+      });
+
+      // IMPORTANTE: el servidor (libs/unalib.js) escapa el nombre y el texto
+      // y valida el color, por eso aqui solo se inserta lo que llega ya saneado.
+      socket.on('Evento-Mensaje-Server', function(msg){
+          var msgJson = JSON.parse(msg);
+          var color = msgJson.color || '#000000';
+          var nombre = msgJson.nombre || '';
+          var mensajeDisplay = "<b style='color:"+ color +"'>" + nombre + "</b>: " + msgJson.mensaje;
+          $('#messages').append($('<li>').html(mensajeDisplay));
+          window.scrollTo(0, document.body.scrollHeight);
+      });
+    }
+
+    document.getElementById('btn-login').addEventListener('click', async function () {
+      try {
+        await auth0Client.loginWithRedirect();
+      } catch (error) {
+        mostrarError('No se pudo iniciar el flujo de Auth0. Revisa la configuracion e intenta de nuevo.');
+      }
+    });
+
+    document.getElementById('btn-logout').addEventListener('click', function () {
+      if (socket) {
+        socket.disconnect();
+        socket = null;
+      }
+
+      document.body.removeAttribute('data-chat-connected');
+
+      if (!auth0Client) {
+        window.location.reload();
+        return;
+      }
+
+      auth0Client.logout({ logoutParams: { returnTo: window.location.origin } });
+    });
+
+    document.getElementById('btn-retry').addEventListener('click', function () {
+      window.location.href = window.location.pathname;
+    });
+
+    (async function main() {
+      var config;
+
+      try {
+        var respuesta = await fetch('/config.json', { cache: 'no-store' });
+        config = await respuesta.json();
+      } catch (error) {
+        mostrarError('No se pudo cargar la configuracion del chat.');
+        return;
+      }
+
+      mostrarVista('loading');
+
+      // modo pruebas: autenticacion desactivada por el servidor
+      if (!config.authRequired) {
+        document.body.setAttribute('data-auth-required', 'false');
+        iniciarChat(null, null);
+        return;
+      }
+
+      document.body.setAttribute('data-auth-required', 'true');
+
+      if (!config.domain || !config.clientId) {
+        mostrarError('La configuracion de Auth0 esta incompleta: falta AUTH0_DOMAIN o AUTH0_CLIENT_ID en el servidor.');
+        return;
+      }
+
+      try {
+        await cargarSdk();
+      } catch (error) {
+        mostrarError('No se pudo cargar el SDK de Auth0. Revisa tu conexion e intenta de nuevo.');
+        return;
+      }
+
+      try {
+        auth0Client = await window.auth0.createAuth0Client({
+          domain: config.domain,
+          clientId: config.clientId,
+          cacheLocation: 'localstorage',
+          authorizationParams: {
+            redirect_uri: window.location.origin,
+            scope: 'openid profile email'
+          }
+        });
+      } catch (error) {
+        mostrarError('No se pudo inicializar Auth0. Revisa el dominio y el client ID.');
+        return;
+      }
+
+      var parametros = new URLSearchParams(window.location.search || window.location.hash.replace(/^#/, ''));
+
+      // 1) Auth0 devolvio un error (cancelacion, callback mismatch, etc.)
+      if (parametros.get('error')) {
+        var codigo = parametros.get('error');
+        var detalle = parametros.get('error_description');
+        window.history.replaceState({}, '', window.location.pathname);
+        mostrarError(mensajeDeError(codigo, detalle));
+        return;
+      }
+
+      // 2) regreso del login con el code
+      if (parametros.get('code') && parametros.get('state')) {
+        try {
+          await auth0Client.handleRedirectCallback();
+          window.history.replaceState({}, '', window.location.pathname);
+        } catch (error) {
+          window.history.replaceState({}, '', window.location.pathname);
+          mostrarError('No se pudo completar el inicio de sesion. Intenta de nuevo.');
+          return;
+        }
+      }
+
+      // 3) estado de la sesion
+      try {
+        if (await auth0Client.isAuthenticated()) {
+          var usuario = await auth0Client.getUser();
+          var token = await auth0Client.getIdToken();
+          iniciarChat(usuario, token);
+          return;
+        }
+      } catch (error) {
+        // sin sesion valida: se muestra la pantalla de login
+      }
+
+      mostrarVista('unauthenticated');
+    })();
     </script>
   </body>
 </html>

@@ -25,7 +25,8 @@ function iniciarServidor(puerto) {
   return new Promise(function (resolve, reject) {
     const hijo = spawn(process.execPath, [SERVER_PATH], {
       cwd: path.resolve(__dirname, '..'),
-      env: Object.assign({}, process.env, { PORT: String(puerto) }),
+      // sin Auth0 en las pruebas: la autenticacion se verifica en auth.socket.test.js
+      env: Object.assign({}, process.env, { PORT: String(puerto), AUTH_REQUIRED: 'false' }),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 

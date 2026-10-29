@@ -50,7 +50,7 @@ test.describe('Chat UNA - pruebas E2E', function () {
   });
 
   test('deberia cargar la pagina del chat y conectar el socket', async function ({ page }) {
-    await expect(page).toHaveTitle('Chat Socket.IO UNA');
+    await expect(page).toHaveTitle('UNA Chat');
     await expect(page.locator('#nombre')).toBeVisible();
     await expect(page.locator('#m')).toBeVisible();
     await expect(page.locator('form button')).toBeVisible();

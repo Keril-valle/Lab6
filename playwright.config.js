@@ -23,6 +23,7 @@ module.exports = defineConfig({
     url: 'http://127.0.0.1:3100',
     reuseExistingServer: !process.env.CI,
     timeout: 30000,
-    env: { PORT: '3100' },
+    // las pruebas E2E no dependen de Auth0: el gate de login se prueba aparte
+    env: { PORT: '3100', AUTH_REQUIRED: 'false' },
   },
 });
