@@ -106,13 +106,15 @@
     }
 
     function mensajeDeError(codigo, detalle) {
+      var tecnico = ' Detalle tecnico: ' + codigo + (detalle ? ' - ' + detalle : '');
+
       if (codigo === 'access_denied') {
-        return 'Cancelaste el inicio de sesion. Cuando quieras, intenta de nuevo.';
+        return 'Cancelaste el inicio de sesion. Cuando quieras, intenta de nuevo.' + tecnico;
       }
       if (codigo === 'invalid_request' || codigo === 'unauthorized_client') {
-        return 'La configuracion de Auth0 no coincide con esta URL. Revisa las Callback y Logout URLs de la aplicacion.';
+        return 'La configuracion de Auth0 no coincide con esta URL. Revisa las Callback y Logout URLs de la aplicacion.' + tecnico;
       }
-      return 'No se pudo iniciar sesion' + (detalle ? ': ' + detalle : '.') + ' Intenta de nuevo.';
+      return 'No se pudo iniciar sesion. Intenta de nuevo.' + tecnico;
     }
 
     // carga el SDK de Auth0 solo cuando hace falta (asi las pruebas no dependen del CDN)
