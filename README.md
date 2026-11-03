@@ -101,6 +101,8 @@ cp .env.example .env          # PowerShell: Copy-Item .env.example .env
 | `AUTH0_DOMAIN` | sí | Dominio del tenant, sin `https://` |
 | `AUTH0_CLIENT_ID` | sí | Client ID de la aplicación SPA (es público) |
 | `AUTH_REQUIRED` | no | `true` por defecto. `false` desactiva la autenticación **solo para pruebas automatizadas** |
+| `SOCKET_URL` | no | Host del socket cuando la página y el socket están en servidores distintos (ej. Vercel + Render). Vacío = mismo host |
+| `ALLOWED_ORIGINS` | no | Orígenes autorizados a abrir el socket, separados por coma (necesario si `SOCKET_URL` es otro host) |
 | `PORT` | no | Puerto del servidor local (3000 por defecto) |
 
 `server.js` carga `.env` automáticamente al arrancar (Node ≥ 20.12). En Vercel las variables se configuran en el panel del proyecto.
@@ -142,15 +144,22 @@ Si la URL está dentro de una frase, por ejemplo `mira esto https://cdn.example.
 
 ## Despliegue en Vercel
 
-1. Importá el repositorio en Vercel (framework preset: **Other**). `vercel.json` ya enruta todas las peticiones a `server.js`.
-2. En **Settings → Environment Variables** (Production y Preview) cargá:
-   - `AUTH0_DOMAIN`
-   - `AUTH0_CLIENT_ID`
-   - `AUTH_REQUIRED=true`
-3. Agregá el dominio de producción en Auth0 (**Allowed Callback URLs**, **Allowed Logout URLs** y **Allowed Web Origins**) y volvé a desplegar para que tome las variables.
-4. Verificá el flujo completo: abrir la URL, **Iniciar sesión**, ver la identidad, **Cerrar sesión**.
+Vercel ejecuta el servidor como función serverless: la página y el flujo de Auth0 funcionan, pero **Socket.IO no puede mantener el servidor HTTP** (los endpoints `/socket.io/*` no llegan al `http.Server`). El despliegue recomendado separa las dos cosas:
 
-> **Nota sobre Socket.IO:** en Vercel las funciones son serverless y no mantienen WebSockets persistentes. El flujo de autenticación funciona igual, pero el chat en tiempo real puede requerir `transports: ['polling']` o mover el socket a un host con proceso persistente.
+| Parte | Host | Variables |
+|---|---|---|
+| Página + login/logout | **Vercel** | `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH_REQUIRED=true`, `SOCKET_URL=https://tu-socket.onrender.com`, `ALLOWED_ORIGINS=https://tu-app.vercel.app` |
+| Servidor del chat (Socket.IO) | **Render / Railway** | `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH_REQUIRED=true`, `ALLOWED_ORIGINS=https://tu-app.vercel.app` |
+
+Pasos:
+
+1. Desplegar el repo en Render/Railway (proceso Node persistente) y anotar su URL.
+2. Importar el repo en Vercel (framework preset: **Other**). `vercel.json` enruta todo a `server.js`.
+3. Cargar las variables de la tabla en cada host y redesplegar.
+4. En Auth0 agregar **ambos** dominios a **Allowed Callback URLs**, **Allowed Logout URLs** y **Allowed Web Origins** (uno por línea, junto con `http://localhost:3000`).
+5. Verificar: abrir la URL de Vercel → **Iniciar sesión** → identidad → **Cerrar sesión** → y enviar un mensaje para confirmar que el socket conecta contra Render.
+
+Si preferís un único host, desplegá todo en Render y dejá `SOCKET_URL` vacío: el chat funciona igual, pero la entrega pide la URL de Vercel.
 
 ## Seguridad
 

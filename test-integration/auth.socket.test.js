@@ -125,6 +125,6 @@ describe('handshake de Socket.IO con autenticacion activa', function () {
     expect(config.authRequired).toBe(true);
     expect(config.domain).toBe('tenant.test');
     expect(config.clientId).toBe('client-de-prueba');
-    expect(Object.keys(config).sort()).toEqual(['authRequired', 'clientId', 'domain']);
+    expect(Object.keys(config).sort()).toEqual(['authRequired', 'clientId', 'domain', 'socketUrl']);
   });
 });

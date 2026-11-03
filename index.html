@@ -40,6 +40,7 @@
       }
       #view-chat #messages { padding-top: 44px; }
       #user-name { font-weight: bold; }
+      #chat-status { color: #f0b429; font-size: 12px; }
       [hidden] { display: none !important; }
     </style>
   </head>
@@ -59,7 +60,7 @@
 
     <div id="view-chat" hidden>
       <header id="chat-header">
-        <span>Conectado como <strong id="user-name"></strong></span>
+        <span>Conectado como <strong id="user-name"></strong> <span id="chat-status"></span></span>
         <button id="btn-logout" type="button">Cerrar sesion</button>
       </header>
       <ul id="messages"></ul>
@@ -131,23 +132,32 @@
       });
     }
 
-    function iniciarChat(usuario, token) {
+    function iniciarChat(usuario, token, socketUrl) {
       document.getElementById('user-name').textContent =
         usuario ? (usuario.name || usuario.email || 'usuario') : 'modo pruebas';
 
       mostrarVista('chat');
 
-      socket = io({ auth: { token: token || '' } });
+      // si el socket vive en otro host, la URL viene en /config.json (socketUrl)
+      socket = io(socketUrl || undefined, { auth: { token: token || '' } });
 
       // marca de conexion para pruebas de integracion/E2E
       socket.on('connect', function () {
         document.body.setAttribute('data-chat-connected', 'true');
+        document.getElementById('chat-status').textContent = '';
       });
 
-      // el servidor rechaza la conexion cuando el token no es valido
-      socket.on('connect_error', function () {
+      socket.on('connect_error', function (error) {
+        // el servidor rechaza la conexion cuando el token no es valido
+        if (error && error.message === 'unauthorized') {
+          document.body.removeAttribute('data-chat-connected');
+          mostrarError('Tu sesion no es valida o expiro. Inicia sesion de nuevo para seguir chateando.');
+          return;
+        }
+
+        // fallo de red o arranque en frio: socket.io reintenta solo
         document.body.removeAttribute('data-chat-connected');
-        mostrarError('Tu sesion no es valida o expiro. Inicia sesion de nuevo para seguir chateando.');
+        document.getElementById('chat-status').textContent = 'Reconectando con el servidor...';
       });
 
       // emite evento al servidor
@@ -221,7 +231,7 @@
       // modo pruebas: autenticacion desactivada por el servidor
       if (!config.authRequired) {
         document.body.setAttribute('data-auth-required', 'false');
-        iniciarChat(null, null);
+        iniciarChat(null, null, config.socketUrl);
         return;
       }
 
@@ -282,7 +292,7 @@
         if (await auth0Client.isAuthenticated()) {
           var usuario = await auth0Client.getUser();
           var token = await auth0Client.getIdToken();
-          iniciarChat(usuario, token);
+          iniciarChat(usuario, token, config.socketUrl);
           return;
         }
       } catch (error) {

@@ -26,6 +26,6 @@ test.describe('UNA Chat - gate de autenticacion', function () {
     const config = await respuesta.json();
 
     expect(config.authRequired).toBe(false);
-    expect(Object.keys(config).sort()).toEqual(['authRequired', 'clientId', 'domain']);
+    expect(Object.keys(config).sort()).toEqual(['authRequired', 'clientId', 'domain', 'socketUrl']);
   });
 });

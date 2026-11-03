@@ -13,7 +13,16 @@ var auth = require('./libs/auth');
 var express = require('express');
 var app = express();
 var http = require('http').Server(app);
-var io = require('socket.io')(http);
+
+// CORS del socket: permite que la pagina servida desde Vercel use el socket de otro host
+var origenesPermitidos = (process.env.ALLOWED_ORIGINS || '*')
+  .split(',')
+  .map(function (origen) { return origen.trim(); })
+  .filter(Boolean);
+
+var io = require('socket.io')(http, {
+  cors: { origin: origenesPermitidos, methods: ['GET', 'POST'] },
+});
 var port = process.env.PORT || 3000;
 
 // configuracion de autenticacion (Auth0)
@@ -34,6 +43,8 @@ app.get('/config.json', function (req, res) {
     domain: dominio,
     clientId: clientId,
     authRequired: authRequerida,
+    // si el socket vive en otro host (p. ej. Vercel sirve la pagina y Render el socket)
+    socketUrl: process.env.SOCKET_URL || '',
   });
 });
 
