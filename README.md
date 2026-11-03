@@ -144,7 +144,7 @@ Si la URL está dentro de una frase, por ejemplo `mira esto https://cdn.example.
 
 ## Despliegue en Vercel
 
-Vercel ejecuta el servidor como función serverless: la página y el flujo de Auth0 funcionan, pero **Socket.IO no puede mantener el servidor HTTP** (los endpoints `/socket.io/*` no llegan al `http.Server`). El despliegue recomendado separa las dos cosas:
+Vercel ejecuta el servidor como función serverless: la página y el flujo de Auth0 funcionan, pero **Socket.IO no puede mantener el servidor HTTP** (los endpoints `/socket.io/*` no llegan al `http.Server`). Por eso en un despliegue solo en Vercel el login, el logout y la identidad funcionan, y el chat en vivo se muestra como no disponible. Para tener chat en vivo hace falta un host con proceso persistente, como describe la tabla siguiente:
 
 | Parte | Host | Variables |
 |---|---|---|

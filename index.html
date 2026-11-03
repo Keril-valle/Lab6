@@ -155,9 +155,9 @@
           return;
         }
 
-        // fallo de red o arranque en frio: socket.io reintenta solo
+        // sin servidor de sockets alcanzable (p. ej. despliegue solo en Vercel)
         document.body.removeAttribute('data-chat-connected');
-        document.getElementById('chat-status').textContent = 'Reconectando con el servidor...';
+        document.getElementById('chat-status').textContent = 'Chat en vivo no disponible en este despliegue.';
       });
 
       // emite evento al servidor
