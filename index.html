@@ -293,12 +293,20 @@
       try {
         if (await auth0Client.isAuthenticated()) {
           var usuario = await auth0Client.getUser();
-          var token = await auth0Client.getIdToken();
+          var claims = await auth0Client.getIdTokenClaims();
+          var token = claims ? claims.__raw : null;
+
+          if (!token) {
+            throw new Error('No se pudo obtener el ID Token');
+          }
+
           iniciarChat(usuario, token, config.socketUrl);
           return;
         }
       } catch (error) {
-        // sin sesion valida: se muestra la pantalla de login
+        console.error('Error al recuperar sesion:', error);
+        mostrarError('No se pudo recuperar la sesion de Auth0. Intenta de nuevo.');
+        return;
       }
 
       mostrarVista('unauthenticated');
