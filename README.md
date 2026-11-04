@@ -1,23 +1,20 @@
 # UNA Chat
 
-Aplicación de chat en tiempo real desarrollada con Node.js, Express y Socket.IO. Además de mensajes de texto, el chat reconoce URLs de imágenes y videos y las muestra directamente en la conversación. El acceso requiere iniciar sesión con una cuenta social mediante Auth0.
+Aplicación de chat en tiempo real desarrollada con Node.js, Express y Socket.IO. Además de mensajes de texto, el chat reconoce URLs de imágenes y videos y las muestra en la conversación. El acceso requiere iniciar sesión con una cuenta social mediante Auth0.
 
 ## Características
 
-- Chat en tiempo real con Socket.IO.
-- Inicio de sesión social (OAuth/OIDC) con Auth0; sin contraseña propia.
+- Inicio de sesión social (OAuth/OIDC) con Auth0, sin contraseña propia.
 - Identidad del usuario autenticado visible y cierre de sesión.
 - El chat exige autenticación: el servidor rechaza conexiones sin token válido.
-- Nombre de usuario y color asignado por cliente.
-- Renderizado de imágenes mediante etiquetas `<img>`.
-- Reproducción de videos de YouTube mediante `<iframe>`.
-- Reproducción de archivos de video directos (`.mp4`, `.webm`, `.ogg`) con `<video controls>`.
+- Chat en tiempo real con Socket.IO.
+- Renderizado de imágenes (`<img>`), videos de YouTube (`<iframe>`) y videos directos (`<video controls>`).
 - Validación y sanitización de todo el contenido enviado por los usuarios.
 - Pruebas unitarias, de integración y E2E.
 
 ## Requisitos
 
-- Node.js 20 o superior (la verificación de tokens usa `jose` 6).
+- Node.js 20.12 o superior (se usa `process.loadEnvFile` y `jose` 6).
 - npm 9 o superior.
 - Una cuenta gratuita en <https://auth0.com> con una aplicación SPA (ver [Autenticación con Auth0](#autenticación-con-auth0)).
 
@@ -27,100 +24,110 @@ Aplicación de chat en tiempo real desarrollada con Node.js, Express y Socket.IO
 npm install
 ```
 
-Para las pruebas E2E, instala el navegador de Playwright una sola vez:
+Para las pruebas E2E, instalá el navegador de Playwright una sola vez:
 
 ```bash
 npx playwright install chromium
 ```
 
-## Ejecución
+## Configuración local
 
-Antes de arrancar, copiá las variables de entorno:
+1. Copiá el archivo de variables:
 
-```bash
-cp .env.example .env          # PowerShell: Copy-Item .env.example .env
-```
+   ```bash
+   cp .env.example .env          # PowerShell: Copy-Item .env.example .env
+   ```
 
-y completá `AUTH0_DOMAIN` y `AUTH0_CLIENT_ID` (ver [Autenticación con Auth0](#autenticación-con-auth0)).
+2. Completá `AUTH0_DOMAIN` y `AUTH0_CLIENT_ID` con los datos de tu aplicación en Auth0 (ver más abajo).
+3. Arrancá el servidor:
 
-```bash
-npm start
-```
+   ```bash
+   npm start
+   ```
 
-Abre [http://localhost:3000](http://localhost:3000) en el navegador. Para usar otro puerto:
+4. Abrí [http://localhost:3000](http://localhost:3000) (usá `localhost`, no `127.0.0.1`).
 
-```bash
-PORT=4000 npm start
-```
-
-En PowerShell:
-
-```powershell
-$env:PORT=4000; npm start
-```
+Para usar otro puerto: `PORT=4000 npm start` (PowerShell: `$env:PORT=4000; npm start`).
 
 ## Autenticación con Auth0
 
-El acceso al chat requiere una sesión iniciada con una red social (OAuth/OIDC mediante Auth0). La autenticación ocurre en el navegador con el SDK oficial `auth0-spa-js` y el servidor valida el token en el handshake de Socket.IO, por lo que **el proyecto no usa `client_secret`**.
+El login ocurre en el navegador con el SDK oficial `auth0-spa-js`. El servidor valida el ID token en el handshake de Socket.IO, así que **el proyecto no usa `client_secret`**.
 
 ### 1. Crear la aplicación en Auth0
 
 1. Crear una cuenta en <https://auth0.com/signup> y elegir región (no se puede cambiar después).
-2. **Applications → Applications → Create Application**:
+2. Ir a **Applications → Applications → Create Application**:
    - Name: `UNA CHAT`
    - Application Type: **Single Page Application**
-3. En **Settings**, completar y **guardar**:
+3. En **Settings**, completar y **guardar** (Save Changes):
 
-   | Campo | Local | Vercel |
-   |---|---|---|
-   | Allowed Callback URLs | `http://localhost:3000` | `https://TU-APP.vercel.app` |
-   | Allowed Logout URLs | `http://localhost:3000` | `https://TU-APP.vercel.app` |
-   | Allowed Web Origins | `http://localhost:3000` | `https://TU-APP.vercel.app` |
+   | Campo | Valor |
+   |---|---|
+   | Allowed Callback URLs | `http://localhost:3000`, `https://TU-APP.vercel.app` |
+   | Allowed Logout URLs | `http://localhost:3000`, `https://TU-APP.vercel.app` |
+   | Allowed Web Origins | `http://localhost:3000`, `https://TU-APP.vercel.app` |
 
-   > En una SPA el callback es el origen exacto (sin `/callback`) y debe coincidir carácter por carácter: usá `localhost`, no `127.0.0.1`.
+   Varios valores van separados por coma, en una sola línea cada campo.
 
-4. Anotar **Domain** y **Client ID**. El **Client Secret no se usa** en este flujo y no debe copiarse a ningún archivo.
+   > En una SPA el callback es el origen exacto (sin `/callback`) y debe coincidir carácter por carácter. Usá `localhost`, no `127.0.0.1`.
+
+4. Anotar **Domain** y **Client ID**. El **Client Secret** no se usa en este flujo y no debe copiarse a ningún archivo.
 
 ### 2. Habilitar el proveedor social (GitHub)
 
-1. GitHub → **Settings → Developer settings → OAuth Apps → New OAuth App**.
+1. En GitHub: **Settings → Developer settings → OAuth Apps → New OAuth App**.
    - Homepage URL: `http://localhost:3000`
    - Authorization callback URL: `https://TU-TENANT.us.auth0.com/login/callback`
 2. Copiar el **Client ID** y generar un **Client Secret**.
-3. Auth0 → **Authentication → Social → Create Connection → GitHub**: pegar ambos valores y guardar.
-4. Auth0 → **Applications → UNA CHAT → Connections**: activar la conexión `github`.
+3. En Auth0: **Authentication → Social → Create Connection → GitHub**. Pegar ambos valores y guardar.
+4. En Auth0: **Applications → UNA CHAT → Connections**: activar la conexión `github`.
 
-### 3. Variables de entorno
-
-```bash
-cp .env.example .env          # PowerShell: Copy-Item .env.example .env
-```
+## Variables de entorno
 
 | Variable | Obligatoria | Descripción |
 |---|---|---|
 | `AUTH0_DOMAIN` | sí | Dominio del tenant, sin `https://` |
 | `AUTH0_CLIENT_ID` | sí | Client ID de la aplicación SPA (es público) |
-| `AUTH_REQUIRED` | no | `true` por defecto. `false` desactiva la autenticación **solo para pruebas automatizadas** |
-| `SOCKET_URL` | no | Host del socket cuando la página y el socket están en servidores distintos (ej. Vercel + Render). Vacío = mismo host |
-| `ALLOWED_ORIGINS` | no | Orígenes autorizados a abrir el socket, separados por coma (necesario si `SOCKET_URL` es otro host) |
+| `AUTH_REQUIRED` | no | `true` por defecto. `false` solo para pruebas automatizadas |
 | `PORT` | no | Puerto del servidor local (3000 por defecto) |
+| `SOCKET_URL` | no | Host del socket si está separado de la página. Vacío = mismo host |
+| `ALLOWED_ORIGINS` | no | Orígenes permitidos para el socket, separados por coma |
 
-`server.js` carga `.env` automáticamente al arrancar (Node ≥ 20.12). En Vercel las variables se configuran en el panel del proyecto.
+En Vercel las variables se configuran en **Project → Settings → Environment Variables**.
 
-### 4. Cómo funciona
+## Cómo funciona el login
 
-1. `GET /config.json` devuelve `{ domain, clientId, authRequired }`: solo información pública.
-2. El cliente inicializa Auth0, redirige al Universal Login y procesa el callback con `handleRedirectCallback()`.
-3. Con sesión iniciada, el chat se conecta a Socket.IO enviando el ID token en `auth.token`.
-4. El servidor verifica firma, emisor, audiencia y expiración contra el JWKS del tenant (`libs/auth.js`); si algo falla, rechaza la conexión con `unauthorized`.
-5. **Cerrar sesión** invalida la sesión de Auth0 y vuelve a la pantalla de inicio.
-6. Si el usuario cancela o Auth0 devuelve un error, la página muestra el mensaje y un botón **Reintentar**.
+1. `GET /config.json` devuelve `{ domain, clientId, authRequired, socketUrl }`: solo información pública.
+2. El cliente inicializa Auth0 y redirige al Universal Login.
+3. Al volver, procesa el callback con `handleRedirectCallback()` y obtiene la identidad con `getUser()` y el ID token con `getIdTokenClaims()`.
+4. Con sesión iniciada, el chat se conecta a Socket.IO enviando el ID token en `auth.token`.
+5. El servidor verifica firma, emisor, audiencia y expiración contra el JWKS del tenant (`libs/auth.js`). Si algo falla, rechaza la conexión con `unauthorized`.
+6. **Cerrar sesión** cierra la sesión en Auth0 y vuelve a la pantalla de inicio.
+7. Si el usuario cancela o Auth0 devuelve un error, la página muestra el mensaje con el detalle técnico y un botón **Reintentar**.
+
+## Despliegue en Vercel
+
+Vercel ejecuta el servidor como función serverless. El login, la identidad y el logout funcionan en Vercel. **El chat en vivo no**: Socket.IO necesita un proceso persistente que Vercel no ofrece. En ese despliegue la página muestra "Chat en vivo no disponible en este despliegue".
+
+Pasos:
+
+1. Importar el repositorio en Vercel (framework preset: **Other**). `vercel.json` enruta todas las peticiones a `server.js`.
+2. En **Settings → Environment Variables** (Production y Preview) cargar:
+   - `AUTH0_DOMAIN`
+   - `AUTH0_CLIENT_ID`
+   - `AUTH_REQUIRED=true`
+
+   No cargar `SOCKET_URL`.
+3. En Auth0 agregar la URL de Vercel a **Allowed Callback URLs**, **Allowed Logout URLs** y **Allowed Web Origins** (ver la tabla de arriba).
+4. Redesplegar para que tome las variables.
+5. Verificar en `https://TU-APP.vercel.app`: **Iniciar sesión** → identidad visible → **Cerrar sesión**.
+
+Para tener chat en vivo también desde Vercel, habría que alojar el servidor de Socket.IO en un host con proceso persistente y configurar `SOCKET_URL` y `ALLOWED_ORIGINS`.
 
 ## Uso
 
-1. Escribe un nombre en el campo **Username** (si lo dejas vacío se mostrará como `Anomimo`).
-2. Escribe un mensaje o una URL de medio en el campo de texto.
-3. Presiona **Send**.
+1. Iniciá sesión con GitHub.
+2. Escribí un mensaje o una URL de medio y presioná **Send**. Si no escribís nombre, se muestra como `Anomimo`.
 
 ### URLs soportadas
 
@@ -132,34 +139,7 @@ La URL debe ocupar todo el mensaje, sin texto adicional.
 | YouTube | `youtube.com/watch?v=...`, `youtu.be/...`, `youtube.com/embed/...` | `<iframe>` embebido |
 | Video directo | `.mp4`, `.webm`, `.ogg` | `<video controls>` |
 
-Ejemplos:
-
-```text
-http://image.com/image.jpg
-https://www.youtube.com/watch?v=qYwlqx-JLok
-https://cdn.example.com/clip.mp4
-```
-
-Si la URL está dentro de una frase, por ejemplo `mira esto https://cdn.example.com/clip.mp4`, el mensaje se muestra como texto.
-
-## Despliegue en Vercel
-
-Vercel ejecuta el servidor como función serverless: la página y el flujo de Auth0 funcionan, pero **Socket.IO no puede mantener el servidor HTTP** (los endpoints `/socket.io/*` no llegan al `http.Server`). Por eso en un despliegue solo en Vercel el login, el logout y la identidad funcionan, y el chat en vivo se muestra como no disponible. Para tener chat en vivo hace falta un host con proceso persistente, como describe la tabla siguiente:
-
-| Parte | Host | Variables |
-|---|---|---|
-| Página + login/logout | **Vercel** | `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH_REQUIRED=true`, `SOCKET_URL=https://tu-socket.onrender.com`, `ALLOWED_ORIGINS=https://tu-app.vercel.app` |
-| Servidor del chat (Socket.IO) | **Render / Railway** | `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH_REQUIRED=true`, `ALLOWED_ORIGINS=https://tu-app.vercel.app` |
-
-Pasos:
-
-1. Desplegar el repo en Render/Railway (proceso Node persistente) y anotar su URL.
-2. Importar el repo en Vercel (framework preset: **Other**). `vercel.json` enruta todo a `server.js`.
-3. Cargar las variables de la tabla en cada host y redesplegar.
-4. En Auth0 agregar **ambos** dominios a **Allowed Callback URLs**, **Allowed Logout URLs** y **Allowed Web Origins** (uno por línea, junto con `http://localhost:3000`).
-5. Verificar: abrir la URL de Vercel → **Iniciar sesión** → identidad → **Cerrar sesión** → y enviar un mensaje para confirmar que el socket conecta contra Render.
-
-Si preferís un único host, desplegá todo en Render y dejá `SOCKET_URL` vacío: el chat funciona igual, pero la entrega pide la URL de Vercel.
+Si la URL está dentro de una frase, el mensaje se muestra como texto.
 
 ## Seguridad
 
@@ -167,10 +147,10 @@ La validación se concentra en `libs/unalib.js`:
 
 - Solo se aceptan URLs con esquema `http` o `https`.
 - Se rechazan comillas, apóstrofos, backticks, espacios, paréntesis angulares y caracteres de control.
-- Solo las extensiones incluidas en la lista blanca pueden generar etiquetas de medio.
+- Solo las extensiones de la lista blanca generan etiquetas de medio.
 - Los esquemas `javascript:`, `data:`, `blob:`, `file:` y `vbscript:` se muestran como texto escapado.
-- El nombre, el mensaje y los atributos generados se escapan con entidades HTML.
-- El color se valida contra una lista blanca hexadecimal; en caso contrario se usa `#000000`.
+- El nombre, el mensaje y los atributos se escapan con entidades HTML.
+- El color se valida contra una lista blanca hexadecimal; si no es válido se usa `#000000`.
 - Los identificadores de YouTube se limitan a 11 caracteres `[A-Za-z0-9_-]`.
 
 Los mensajes retransmitidos mantienen el contrato del evento `Evento-Mensaje-Server`: un string JSON con `nombre`, `mensaje`, `color` y `tipo` (`imagen`, `video` o `texto`).
@@ -179,95 +159,48 @@ Los mensajes retransmitidos mantienen el contrato del evento `Evento-Mensaje-Ser
 
 | Comando | Runner | Alcance |
 |---|---|---|
-| `npm test` | Mocha | Pruebas unitarias de `libs/unalib.js` y de la verificación de tokens (`libs/auth.js`) |
+| `npm test` | Mocha | Unitarias de `libs/unalib.js` y de verificación de tokens (`libs/auth.js`) |
 | `npm run test:integration` | Jest | Servidor real + Socket.IO; incluye el rechazo de conexiones sin token |
-| `npm run test:e2e` | Playwright | Navegador Chromium sobre el chat real |
+| `npm run test:e2e` | Playwright | Chromium sobre el chat real |
 | `npm run test:all` | Todos | Unitarias + integración + E2E |
 
-> Las pruebas arrancan el servidor con `AUTH_REQUIRED=false` para no depender de un login real. La verificación de tokens se prueba con un JWKS local y el rechazo de conexiones con `tenant.test`, sin llamadas a Auth0.
-
-### Pruebas unitarias
-
-```bash
-npm test
-```
-
-Cubren validación de teléfonos, URLs de imagen, YouTube y video directo, clasificación de mensajes, normalización de entradas y protección contra inyección de scripts.
-
-### Pruebas de integración
-
-```bash
-npm run test:integration
-```
-
-Levantan `server.js` como proceso hijo en un puerto libre, conectan clientes con `socket.io-client` y verifican el evento `Evento-Mensaje-Server`, el broadcast a varios clientes y el rechazo de entradas maliciosas.
-
-### Pruebas E2E
-
-```bash
-npm run test:e2e
-```
-
-Usan Chromium en modo visible con un retraso (`slowMo`) de 1 segundo por acción y una pausa de 1 segundo al final de cada escenario. Esto permite observar cómo se completan las pruebas. En entornos con `CI` definido, Playwright se ejecuta en modo headless.
-
-Las pruebas sirven jQuery, Socket.IO, la imagen, el video y el iframe de YouTube desde fixtures locales, por lo que no dependen de CDNs externos.
-
-## Análisis de seguridad
-
-El proyecto incluye [Snyk](https://snyk.io/) como dependencia de desarrollo:
-
-```bash
-npx snyk auth
-npx snyk test
-npx snyk test --severity-threshold=high
-```
-
-Para revisar solo las dependencias de producción:
-
-```bash
-npm audit --omit=dev
-```
+Las pruebas arrancan el servidor con `AUTH_REQUIRED=false` para no depender de un login real. La verificación de tokens se prueba con un JWKS local, sin llamadas a Auth0.
 
 ## Estructura del proyecto
 
 ```text
-despues/
-├── index.html                     # Cliente del chat (jQuery + Socket.IO)
-├── server.js                      # Servidor Express + Socket.IO
+Lab6/
+├── index.html                     # Cliente: login Auth0, identidad, chat (jQuery + Socket.IO)
+├── server.js                      # Servidor Express + Socket.IO, /config.json, handshake con token
 ├── libs/
-│   └── unalib.js                  # Validación, sanitización y renderizado de medios
+│   ├── unalib.js                  # Validación, sanitización y renderizado de medios
 │   └── auth.js                    # Verificación del ID token de Auth0 (JWKS)
 ├── test/
-│   ├── test.js                    # Pruebas unitarias (Mocha)
+│   ├── test.js                    # Pruebas unitarias del chat (Mocha)
 │   └── auth.test.js               # Pruebas de verificación de tokens
 ├── test-integration/
 │   ├── chat.socket.test.js        # Pruebas de integración (Jest)
 │   └── auth.socket.test.js        # Rechazo de conexiones sin token
 ├── e2e/
-│   ├── chat.spec.js               # Pruebas E2E (Playwright)
+│   ├── chat.spec.js               # Pruebas E2E del chat (Playwright)
+│   ├── auth.spec.js               # Pruebas E2E del gate de autenticación
 │   └── fixtures/                  # jQuery y video usados por las pruebas E2E
+├── openspec/                      # Especificaciones de los cambios (ignorado por git)
+├── .env.example                   # Variables requeridas, sin credenciales
+├── vercel.json                    # Configuración de despliegue en Vercel
 ├── jest.config.js
 ├── playwright.config.js
-├── openspec/                      # Especificaciones y cambio activo (ignorado por git)
-├── .env.example                   # Variables de entorno requeridas (sin credenciales)
-├── vercel.json                    # Configuración de despliegue
 ├── package.json
 └── README.md
 ```
 
 ## Tecnologías
 
-- Node.js
-- Express
-- Socket.IO
-- jQuery
-- Mocha
-- Jest
-- Playwright
+- Node.js, Express, Socket.IO, jQuery
+- `auth0-spa-js` (login en el navegador) y `jose` (verificación de tokens)
+- Mocha, Jest, Playwright
 - Snyk
 
 ## Contexto académico
 
-Proyecto desarrollado para el laboratorio de Paradigmas de Programación. El cambio `add-chat-media-urls` documenta el comportamiento de detección y renderizado de medios en `openspec/changes/add-chat-media-urls/`.
-
-La historia de usuario **US 01 — Autenticación social en UNA Chat** se especifica en `openspec/changes/add-auth0-social-login/` (proposal, specs `chat-auth`, design y tasks).
+Proyecto desarrollado para el laboratorio de Paradigmas de Programación. El cambio `add-chat-media-urls` documenta la detección y renderizado de medios en `openspec/changes/add-chat-media-urls/`. La historia de usuario **US 01 — Autenticación social en UNA Chat** se especifica en `openspec/changes/add-auth0-social-login/`.
